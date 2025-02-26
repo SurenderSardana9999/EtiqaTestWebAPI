@@ -6,13 +6,12 @@ namespace EtiqaTestAPI.Entity
 {
     public class Freelancer
     {
-        [JsonIgnore]
+       
         public int Id { get; set; }
-        public string Username { get; set; }
+        public string? Username { get; set; }
         public string Email { get; set; }
         public string PhoneNumber { get; set; }
-        public List<Skill> Skillsets { get; set; } = new();
-        public List<Hobby> Hobbies { get; set; } = new();
         public bool IsArchived { get; set; } = false;
+        public List<FreelancerSkillMapping> SkillMappings { get; set; }
     }
 }

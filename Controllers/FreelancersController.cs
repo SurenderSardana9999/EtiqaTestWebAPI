@@ -16,23 +16,87 @@ namespace EtiqaTestAPI.Controllers
             _context = context;
         }
 
+
         [HttpGet]
+        [ResponseCache(Duration = 10, Location = ResponseCacheLocation.Any, NoStore = false)]
         public async Task<ActionResult<IEnumerable<Freelancer>>> GetFreelancers()
         {
-            return await _context.Freelancers.Include(f => f.Skillsets).Include(f => f.Hobbies).Where(f => !f.IsArchived).ToListAsync();
+            var freelancers = await _context.Freelancers.AsNoTracking()
+        .Include(f => f.SkillMappings)
+        .Select(f => new
+        {
+            f.Id,
+            f.Username,
+            f.Email,
+            f.PhoneNumber,
+            f.IsArchived,
+            Skills = f.SkillMappings
+                .Where(sm => sm.SkllsId != null)
+                .Select(sm => _context.Skills.FirstOrDefault(s => s.Id == sm.SkllsId).Name)
+                .ToList(),
+            Hobbies = f.SkillMappings
+                .Where(sm => sm.HobbiesId != null)
+                .Select(sm => _context.Hobbies.FirstOrDefault(h => h.Id == sm.HobbiesId).Name)
+                .ToList()
+        })
+        .ToListAsync();
+
+            return Ok(freelancers);
         }
 
-        [HttpGet("search")]
-        public async Task<ActionResult<IEnumerable<Freelancer>>> SearchFreelancers(string query)
+
+        [HttpGet("search")] 
+        public async Task<ActionResult<IEnumerable<Freelancer>>> SearchFreelancers(string query) =>
+        await _context.Freelancers.AsNoTracking().Where(f => f.Username.Contains(query) || f.Email.Contains(query)).ToListAsync();
+
+
+        [HttpGet("paged")]
+        public async Task<ActionResult<IEnumerable<Freelancer>>> GetFreelancersPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
-            return await _context.Freelancers
-                .Where(f => f.Username.Contains(query) || f.Email.Contains(query))
-                .Include(f => f.Skillsets).Include(f => f.Hobbies)
-                .ToListAsync();
+            var totalRecords = await _context.Freelancers.CountAsync();
+            var freelancers = await _context.Freelancers.AsNoTracking()
+                                            .Include(f => f.SkillMappings)
+        .Select(f => new
+        {
+            f.Id,
+            f.Username,
+            f.Email,
+            f.PhoneNumber,
+            f.IsArchived,
+            Skills = f.SkillMappings
+                .Where(sm => sm.SkllsId != null)
+                .Select(sm => _context.Skills.FirstOrDefault(s => s.Id == sm.SkllsId).Name)
+                .ToList(),
+            Hobbies = f.SkillMappings
+                .Where(sm => sm.HobbiesId != null)
+                .Select(sm => _context.Hobbies.FirstOrDefault(h => h.Id == sm.HobbiesId).Name)
+                .ToList()
+        })
+                                            .Skip((page - 1) * pageSize)
+                                            .Take(pageSize)
+                                            .ToListAsync();
+
+            return Ok(new
+            {
+                TotalRecords = totalRecords,
+                Page = page,
+                PageSize = pageSize,
+                Data = freelancers
+            });
         }
+
+        [HttpGet("hobbies")]
+        public async Task<ActionResult<IEnumerable<Hobby>>> getHobbies() =>
+        await _context.Hobbies.ToListAsync();
+
+
+        [HttpGet("skills")]
+        public async Task<ActionResult<IEnumerable<Skill>>> getSkills() =>
+        await _context.Skills.ToListAsync();
+
 
         [HttpPost]
-        public async Task<ActionResult<Freelancer>> RegisterFreelancer([FromBody] Freelancer freelancer)
+        public async Task<ActionResult<Freelancer>> RegisterFreelancer(Freelancer freelancer)
         {
             if (freelancer == null)
             {
